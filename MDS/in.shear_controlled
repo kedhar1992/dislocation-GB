@@ -1,0 +1,136 @@
+# LAMMPS input file for calculating Peierls stress (shear controlled loading mode)
+# Author: Wurong Jian, wurong@ucsb.edu 
+# If you use this input file, please cite this work
+
+# atomsk --create bcc 3.304 Ta orient [111] [-110] [-1-12] -duplicate 350 215 5 Ta_edge.xsf cfg   # 100 nm
+# atomsk --create bcc 3.304 Ta orient [111] [-110] [-1-12] -duplicate 175 107 5 Ta_edge.xsf cfg   # 50 nm
+# atomsk Ta_edge.xsf -dislocation 0.51*box 0.501*box edge_add Z Y 2.86290677983 0.34 dislocation.cfg 
+
+
+# ------- initialization      -------------------------------------------------
+units metal
+dimension 3
+boundary p s p
+atom_style atomic
+neighbor 2 bin
+
+# ------- create basic geometry      ------------------------------------------------- 
+
+#Create simulation box
+lattice bcc 3.3058
+region whole block -1000 1000 -1000 1000 -1000 1000 units box
+create_box 3 whole 
+mass 1 180.9479  # Ta - 180.9479 amu  
+
+read_dump dump.edge_final 0 x y z box yes add yes
+
+change_box all triclinic
+
+
+# ------- EAM potentials      -------------------------------------------------
+
+# Potentials
+pair_style eam/fs
+pair_coeff * * WTa.eam.fs Ta Ta Ta
+
+ 
+# ------- fixed region      -------------------------------------------------
+variable tmp0 equal "ylo+6"
+variable ylo0 equal ${tmp0}
+variable tmp1 equal "yhi-6"
+variable yhi0 equal ${tmp1}
+
+region upper block INF INF ${yhi0} INF INF INF units box
+region lower block INF INF INF ${ylo0} INF INF units box
+
+group  upper region upper
+group  lower region lower
+group  boundary union upper lower
+group  mobile subtract all boundary
+set group upper type 1
+set group lower type 2
+set group mobile type 3
+
+# ------- energy minimization -------------------------------------------------
+
+variable Etol equal 1.0e-12
+
+min_style cg
+fix 1 all box/relax x 0 z 0 nreset 1
+minimize  ${Etol} ${Etol} 100000 100000
+unfix 1
+
+min_style fire
+minimize  ${Etol} ${Etol} 100000 100000
+
+# ------- MS Load ---------
+
+reset_timestep 0
+timestep 0.001     #1fs
+
+fix freeze boundary setforce 0.0 NULL NULL
+
+variable LY equal ly
+
+variable Eel1   equal  0.00
+variable Eel2   equal  -0.02
+
+variable theta equal PI/2        # in units of radian
+
+variable Epzy   equal  yz/${LY}
+variable Epxy   equal  xy/${LY}
+
+variable  Lzy1  equal   (${Epzy}+${Eel1})*${LY}*cos(${theta})
+variable  Lzy2  equal   (${Epzy}+${Eel2})*${LY}*cos(${theta})
+
+variable  Lxy1  equal   (${Epxy}+${Eel1})*${LY}*sin(${theta})
+variable  Lxy2  equal   (${Epxy}+${Eel2})*${LY}*sin(${theta})
+
+variable N equal 1001
+
+label       loop
+variable    a loop ${N}
+
+variable zyTilt equal (${Lzy1}+(${a}-1)/(${N}-1)*(${Lzy2}-${Lzy1}))
+
+variable xyTilt equal (${Lxy1}+(${a}-1)/(${N}-1)*(${Lxy2}-${Lxy1}))
+
+change_box all yz final ${zyTilt} remap units box       
+
+change_box all xy final ${xyTilt} remap units box
+
+min_style cg
+minimize  ${Etol} ${Etol} 100000 100000
+
+min_style fire
+minimize  ${Etol} ${Etol} 100000 100000
+
+variable yTilt  equal ${zyTilt}*cos(${theta})+${xyTilt}*sin(${theta})
+variable strain equal ${yTilt}/${LY}
+variable PY equal (pyz*cos(${theta})+pxy*sin(${theta}))*0.1          #####MPa
+variable steps equal "dt * step"
+
+# ------- timestep & log      -------------------------------------------------
+
+compute eng all pe/atom
+compute eatoms all reduce sum c_eng
+variable poteng equal "pe" 
+compute 1 all stress/atom NULL
+thermo_style custom step cpu temp pxx pyy pzz pxy pxz pyz xy xz yz pe v_poteng
+thermo 100
+run 0
+
+print "${steps} ${yTilt} ${strain} ${PY} ${poteng}" append edge_pad_50nm.txt
+
+dump 1 all custom 1 dump.${a}.load id type x y z c_1[4] c_1[5] c_eng      #every dump file contains two frames, 0 and 1.
+
+run 0
+undump 1
+uncompute eng
+uncompute eatoms
+uncompute 1
+
+
+
+next        a
+jump        in.shear_controlled loop

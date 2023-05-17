@@ -1,0 +1,196 @@
+# mail id: kedharnath1992@gmail.com 
+# Kindly cite "" if you use the code 
+
+# ---------- Setup Variables --------------------- 
+variable etol equal 1.0e-25 
+variable ftol equal 1.0e-25 
+variable maxiter equal 5000 
+variable maxeval equal 10000 
+variable latparam equal 3.304       # Calculated using the example from LAMMPS site = 3.30389750849317
+variable minimumenergy equal -8.09993597641745
+variable overlapboth equal 1 
+variable gbname index Ta_GB_8
+variable counter equal 0 
+variable inc equal "v_latparam / 6" 
+variable tempo equal 1000000000
+
+# Insert x,y,z sizes in LU and calculate in Angstroms 
+variable zsize1 equal "sqrt(-5^2 + 4^2 + 1^2)" 
+variable ysize1 equal "sqrt(1^2 + 2^2 + -3^2)"  
+
+variable zsize2 equal "sqrt(-5^2 + 4^2 + 1^2)"
+variable ysize2 equal "sqrt(44^2 + 74^2 + -76^2)"                        										
+
+variable zsize3 equal "sqrt(-5^2 + 4^2 + 1^2)"
+variable ysize3 equal "sqrt(1^2 + 2^2 + -3^2)" 
+
+if "${zsize1} <= ${zsize2}" then "variable zsize equal ${zsize1}" else "variable zsize equal ${zsize2}" 
+#if "S{xsize3} <= ${xsize}" then "variable xsize equal ${xsize3}" 
+if "${ysize1} <= ${ysize2}" then "variable ysize equal ${ysize1}" else "variable ysize equal ${ysize2}" 
+#if "S{zsize3} <= ${zsize}" then "variable zsize equal ${zsize3}"
+variable zlen equal "v_zsize * v_latparam" 
+variable ylen equal "v_ysize * v_latparam" 
+ 
+# Determine number of increments for displacement grid in the in-plane GB directions 
+variable zinc equal "floor(v_zlen / v_inc)" 
+variable yinc equal "floor(v_ylen / v_inc)" 
+ 
+# Implement overlap criterion 
+variable overlapinc equal 86 
+ 
+# ---------- Define loops for simulation ---------------------  
+label loopa 
+variable a loop ${zinc} 
+variable tz equal "(v_a-1) / v_zinc * v_zsize" 
+label loopb 
+variable b loop ${yinc}
+variable ty equal "(v_b-1) / v_yinc * v_ysize" 
+label loopd 
+variable d loop ${overlapboth} 
+label loopc 
+variable c loop ${overlapinc} 
+variable overlapdist equal "(0.275 + 0.005 * (v_c-1))*v_latparam"      #range of Poisson's ratio
+ 
+# ---------- Calculate counter and create data directory --------------------- 
+variable ctemp equal ${counter}+1 
+variable counter equal ${ctemp} 
+variable ctemp delete 
+print "Counter: ${counter}" 
+shell mkdir ${gbname} 
+
+# ---------- Initialize Simulation --------------------- 
+clear 
+units metal 
+dimension 3 
+boundary p p p 
+atom_style atomic 
+
+# ---------- Create Atomistic Structure --------------------- 
+#X Dimension = lattice parameter * interplanar distance in x direction
+
+variable ylen1 equal "v_ysize1 * v_latparam * 1"
+variable ylen2 equal "v_ysize2 * v_latparam * 1"
+
+			
+
+variable xsize1 equal "175.641"                       						    				
+variable xsize2 equal "375.935"                       										
+
+lattice bcc ${latparam}
+region whole block 0.0 553  0.0 381.4   0.0  85.64946907 units box   
+create_box 3 whole 
+
+region upper block  INF ${xsize1} INF INF INF INF units box 
+lattice bcc ${latparam} orient x 9 8 13 orient y 44 74 -76 orient z  -5 4 1            			                             
+create_atoms 1 region upper 
+
+region middle block ${xsize1} ${xsize2} INF INF INF INF units box              
+lattice bcc ${latparam}  orient x  1 1 1 orient y 1 2 -3  orient z  -5 4 1 
+create_atoms 2 region middle 
+
+region lower block  ${xsize2} INF INF INF INF INF units box 
+lattice bcc ${latparam} orient x 9 8 13 orient y 44 74 -76 orient z  -5 4 1         					        
+create_atoms 3 region lower 
+
+group upper type 1 
+group middle type 2  
+group lower type 3
+
+# ---------- Define Interatomic Potential --------------------- 
+pair_style eam/fs
+pair_coeff * * WTa.eam.fs Ta Ta Ta
+neighbor 2.0 bin 
+neigh_modify delay 10 check yes 
+ 
+#==========================================================================
+dump 1 all custom 1 dump.first id type x y z
+run 1
+undump 1
+
+# ---------- Displace atoms and delete overlapping atoms --------------------- 
+displace_atoms middle move 0 ${ty} ${tz} units box 
+if "$d == 1" then "delete_atoms overlap ${overlapdist} lower middle"   #lower atom is deleted
+if "$d == 1" then "delete_atoms overlap ${overlapdist} upper middle" 
+if "$d == 2" then "delete_atoms overlap ${overlapdist} middle lower" 
+if "$d == 2" then "delete_atoms overlap ${overlapdist} middle upper" 
+if "$c == 1" then "variable atomprev equal 1" 
+variable natoms equal "count(all)" 
+print "Previous: ${atomprev}, Present: ${natoms}" 
+if "${atomprev} == ${natoms}" then "jump gb3.in loopend" 
+ 
+# ---------- Define Settings --------------------- 
+compute csym all centro/atom bcc
+compute eng all pe/atom 
+compute eatoms all reduce sum c_eng 
+
+# ---------- Run Minimization 1--------------------- 
+reset_timestep 0 
+thermo 10 
+thermo_style custom step pe lx ly lz press pxx pyy pzz c_eatoms
+#dump 1 all custom 1000 dump.* id type x y z
+min_style cg 
+minimize ${etol} ${ftol} ${maxiter} ${maxeval} 
+#undump 1
+
+# ---------- Run Minimization 2--------------------- 
+# Now allow the box to expand/contract perpendicular to the grain boundary
+reset_timestep 0 
+thermo 10 
+thermo_style custom step pe lx ly lz press pxx pyy pzz c_eatoms 
+fix 1 all box/relax x 0.0 vmax 0.001                                                     #Relax only in x directions
+min_style cg 
+minimize ${etol} ${ftol} ${maxiter} ${maxeval} 
+
+# ---------- Run Minimization 3--------------------- 
+reset_timestep 0 
+thermo 10 
+thermo_style custom step pe lx ly lz press pxx pyy pzz c_eatoms
+min_style cg 
+minimize ${etol} ${ftol} ${maxiter} ${maxeval} 
+ 
+# ---------- Calculate GB Energy --------------------- 
+variable esum equal "v_minimumenergy * count(all)" 
+variable xseng equal "c_eatoms - (v_minimumenergy * count(all))" 
+variable gbarea equal "ly * lz * 2" 
+variable gbe equal "(c_eatoms - (v_minimumenergy * count(all)))/v_gbarea" 
+variable gbemJm2 equal ${gbe}*16021.7733 
+variable gbernd equal round(${gbemJm2}) 
+print "After third minimization:" 
+print "GB energy is ${gbemJm2} mJ/m^2" 
+ 
+# Store number of atoms for overlap criterion, i.e., do not rerun equivalent configurations 
+variable atomprev equal "v_natoms" 
+ 
+# ---------- Dump data into Data file ------------- 
+shell cd ${gbname}
+reset_timestep 0 
+timestep 0.001 
+velocity all create 20 95812384 
+fix values all print 1 "${ty} ${tz} ${gbemJm2}" append Values.txt title ""
+
+#===============================================================
+#Store only if it is minimum energy than previous GB
+
+if "${gbemJm2} <= ${tempo}" then "dump 1 all custom 1000 dump.${ty}_${tz}_${gbemJm2} id type x y z c_eng" 
+if "${gbemJm2} <= ${tempo}" then "variable tempo equal ${gbemJm2}" 
+if "${gbemJm2} <= ${tempo}" then "variable transx equal ${ty}" 
+if "${gbemJm2} <= ${tempo}" then "variable transz equal ${tz}" 
+
+run 1 
+shell cd .. 
+ 
+# ---------- End of loop structure ------------- 
+label loopend 
+next c 
+jump gb3.in loopc 
+variable c delete 
+next d 
+jump gb3.in loopd 
+variable d delete 
+next b 
+jump gb3.in loopb 
+variable b delete 
+next a 
+jump gb3.in loopa 
+
+print "All done"
