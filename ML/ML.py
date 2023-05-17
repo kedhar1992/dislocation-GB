@@ -1,6 +1,7 @@
 # kedharnath1992@gmail.com
 # Kindly cite if you use the script ""
 
+#############################################
 # Import necessary modules
 import numpy as np
 import pandas as pd
@@ -23,4 +24,28 @@ list(X.columns)
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=10)   # 25% data for testing
 list(X_test)
+
+#############################################
+cormat = pearcol.corr()
+round(cormat,2)
+fig, ax = plt.subplots(figsize=(15,15))         # Sample figsize in inches
+ax.figure.axes[-1].yaxis.label.set_size(20)
+
+sns.set(font_scale=2)
+plt.xticks(weight = 'bold', fontsize= 15)
+plt.yticks(weight = 'bold', fontsize= 15)
+plt.rcParams["axes.linewidth"] = 1.5
+sns.heatmap(cormat, annot=True, linewidth=.5, ax = ax, fmt=".2f", cmap='coolwarm', cbar_kws={'shrink': 0.8}, annot_kws={'size': 15}, square=True);
+for text in ax.texts:
+    text.set_size(14)
+    if text.get_text() >= '0.7':
+        text.set_size(18)
+        text.set_weight('bold')
+        text.set_style('italic')
+plt.savefig('pearson.png',dpi = 300, bbox_inches = "tight")
+
+#############################################
+
+
+
 
