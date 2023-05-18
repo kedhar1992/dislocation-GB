@@ -45,6 +45,113 @@ for text in ax.texts:
 plt.savefig('pearson.png',dpi = 300, bbox_inches = "tight")
 
 #############################################
+xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', use_rmm = 'True',  # This is the MODEL 
+                          #dtrain,
+                          max_depth = 5,
+                          gamma = 71,
+                          colsample_bytree = 0.654655, 
+                          subsample = 0.49,
+                          learning_rate = 0.99, 
+                          max_delta_step = 9, 
+                          min_child_weight = 0,
+                          random_state = 1,
+                          n_estimators = 85,
+                          alpha = 10,
+                          seed = 3
+                          )
+
+xg_reg.fit(X_train,y_train)
+preds = xg_reg.predict(X_test)     # predict y data using X_test 
+# Low RMSE is desired 
+rmse = np.sqrt(mean_squared_error(y_test, preds))  # calc RMSE bet y_test & y_predict 
+print("RMSE: %f" % (rmse))
+
+# Plotting 
+xgb.plot_importance(xg_reg)
+plt.savefig('feature imp.png',dpi = 300)
+plt.rcParams['figure.figsize'] = [5,5]
+plt.show()
+
+# sort = xg_reg.feature_importances_.argsort()
+# plt.barh(X.columns[sort], xg_reg.feature_importances_[sort])
+# plt.xlabel("Feature Importance")
+
+pred_ytrain = xg_reg.predict(X_train)
+pred_ytest = xg_reg.predict(X_test)
+
+plt.scatter(y_train, pred_ytrain, c='b', label='Training data', s = 70)
+plt.scatter(y_test, pred_ytest, c='r', label='Test data', s = 70)
+plt.plot([0, 1000], [0, 1000], color = 'black', linewidth = 3, linestyle='dashed')
+plt.xlim(0, 400)
+plt.ylim(0, 400)
+
+plt.legend(loc="upper left", fontsize = 17, prop={'weight': 'bold'})
+plt.xticks(weight = 'bold', fontsize= 13)
+plt.yticks(weight = 'bold', fontsize= 13)
+plt.rcParams["axes.linewidth"] = 1.5
+plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
+
+
+plt.xlabel('Calculated values', fontsize= 20, fontweight='bold')
+plt.ylabel('Predicted values', fontsize= 20, fontweight='bold')
+plt.savefig('scatter.png',dpi = 300, bbox_inches = "tight")
+
+#############################################
+shap.initjs()
+explainer = shap.Explainer(xg_reg, X) # (xg_reg, X_test), (xg_reg, X_train), & (xg_reg) shows DIFFERENCE   
+shap_values = explainer(X)   # if X_test is changed to X_train then shows DIFFERENCE; but mostly X_test is used https://www.kaggle.com/code/dansbecker/shap-values
+feature_names = [ a + ": " + str(b) for a,b in zip(X.columns, np.abs(shap_values.values).mean(0).round(1))]
+shap.summary_plot(shap_values, plot_type='violin', feature_names = feature_names, color_bar = False, show = False) 
+
+cbar = plt.colorbar()
+cbar.ax.tick_params(labelsize=15)
+cbar.ax.tick_params(direction='out', length=6, width=2,  grid_alpha=0.5)
+
+plt.xticks(weight = 'bold', fontsize= 13)
+plt.yticks(weight = 'bold', fontsize= 13)
+plt.rcParams["axes.linewidth"] = 1.5
+plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
+plt.xlabel('SHAP value', fontsize= 15, fontweight='bold')
+
+plt.savefig("summary_plot.png", dpi = 300, bbox_inches = "tight")
+plt.close()
+
+shap.summary_plot(shap_values, plot_type='violin', feature_names=feature_names)
+
+shap.plots.scatter(shap_values[:,"Slipplane"], color=shap_values[:,"mprime"], dot_size=40, cmap='rainbow') 
+plt.xticks(weight = 'bold', fontsize= 13)
+plt.yticks(weight = 'bold', fontsize= 13)
+plt.rcParams["axes.linewidth"] = 1.5
+plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
+plt.savefig("Slipplane.png", dpi = 300, bbox_inches = "tight")
+plt.close()
+
+shap.plots.scatter(shap_values[:,"Slipplane"], color=shap_values[:,"Drop in shear stress"], dot_size=40, cmap='rainbow') 
+plt.xticks(weight = 'bold', fontsize= 13)
+plt.yticks(weight = 'bold', fontsize= 13)
+plt.rcParams["axes.linewidth"] = 1.5
+plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
+plt.savefig("Slipplane.png", dpi = 300, bbox_inches = "tight")
+plt.close()
+
+shap.plots.scatter(shap_values[:,"Rotationaxis"], color=shap_values[:,"mprime"], dot_size=40, cmap='rainbow') 
+plt.xticks(weight = 'bold', fontsize= 13)
+plt.yticks(weight = 'bold', fontsize= 13)
+plt.rcParams["axes.linewidth"] = 1.5
+plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
+plt.savefig("Rotationaxis.png", dpi = 300, bbox_inches = "tight")
+plt.close()
+
+shap.plots.scatter(shap_values[:,"Rotationaxis"], color=shap_values[:,"Drop in shear stress"], dot_size=40, cmap='rainbow') 
+plt.xticks(weight = 'bold', fontsize= 13)
+plt.yticks(weight = 'bold', fontsize= 13)
+plt.rcParams["axes.linewidth"] = 1.5
+plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
+plt.savefig("Rotationaxis.png", dpi = 300, bbox_inches = "tight")
+plt.close()
+
+
+
 
 
 
