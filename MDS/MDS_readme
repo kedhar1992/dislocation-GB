@@ -1,3 +1,6 @@
+# Mail id: kedharnath1992@gmail.com 
+# If you use these scripts, kindly cite "".
+
 1. gb.in: The asymmetric tilt/twist GB configurations were modeled with [-1-12] and [-110] as tilt axes and [111] as twist axis using gb.in
 
 2. in.shear_controlled: The dislocation-GB interaction was carried by shearing the simulation box. Credits to Wurong Jian, wurong@ucsb.edu for the script 'in.shear_controlled'
