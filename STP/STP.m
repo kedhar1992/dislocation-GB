@@ -1,7 +1,8 @@
-% Copyright 2013 Max-Planck-Institut für Eisenforschung GmbH
-%% Example of function used to calculate mprime parameter
+# Mail id: kedharnath1992@gmail.com 
+# If you use these scripts, kindly cite "".
+
 tabularasa;
-% author: d.mercier@mpie.de
+
 
 %%%%%%%%%%%%%% INPUT  - START
 %%%%  112 TILT AXIS
