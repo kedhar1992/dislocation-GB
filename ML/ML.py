@@ -10,11 +10,13 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
+!pip install shap
 import shap as shap
 
 # Read the input data and select data for analysis 
 df = pd.read_excel("data_ML.xlsx")
 df.head()
+pearcol = df.drop(df.columns[[2,3,4,5,6,10,12,13]], axis ='columns') 
 X = df.drop(df.columns[[2,3,4,5,6,8,10,12,13, 16,17,18,20]], axis ='columns')   # Drop in stress = 7; yield stress = 8; critical distance = 9; Drop in PE = 11
 # Rotation axis = 0; slip plane = 1
 y = df.Yieldstress
@@ -45,19 +47,17 @@ for text in ax.texts:
 plt.savefig('pearson.png',dpi = 300, bbox_inches = "tight")
 
 #############################################
-xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', use_rmm = 'True',  # This is the MODEL 
-                          #dtrain,
-                          max_depth = 5,
-                          gamma = 71,
-                          colsample_bytree = 0.654655, 
-                          subsample = 0.49,
-                          learning_rate = 0.99, 
-                          max_delta_step = 9, 
-                          min_child_weight = 0,
+xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', use_rmm = 'True', 
+                          max_depth = 3,
+                          gamma = 85,
+                          colsample_bytree = 0.191421, 
+                          subsample = 0.284894,
+                          learning_rate = 0.843006, 
+                          max_delta_step = 67, 
                           random_state = 1,
-                          n_estimators = 85,
-                          alpha = 10,
-                          seed = 3
+                          n_estimators = 99,
+                          alpha = 6,
+                          seed = 19
                           )
 
 xg_reg.fit(X_train,y_train)
@@ -149,10 +149,3 @@ plt.rcParams["axes.linewidth"] = 1.5
 plt.tick_params(direction='out', length=6, width=2, grid_alpha=0.5)
 plt.savefig("Rotationaxis.png", dpi = 300, bbox_inches = "tight")
 plt.close()
-
-
-
-
-
-
-
